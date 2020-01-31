@@ -6,13 +6,9 @@ import lombok.Data;
 
 @Data
 @Component
-public class WeatherDetailsDTO {
-
-	private String locationName;
-
-	private String temperature;
+public class SearchCriteria {
 	private String countryName;
 	private String stateName;
-	private String humidity;
+	private String locationName;
 
 }

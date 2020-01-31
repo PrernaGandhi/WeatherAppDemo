@@ -8,7 +8,7 @@ import com.epam.weatherapp.dto.WeatherDetailsDTO;
 import com.epam.weatherapp.entity.WeatherDetails;
 
 @Component
-public class WeatherDetailsMapper {
+public class WeatherDetailsMapper {//check model mapper configuration
 	@Autowired
     private ModelMapper modelMapper;
 	

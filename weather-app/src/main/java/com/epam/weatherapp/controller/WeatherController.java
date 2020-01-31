@@ -9,12 +9,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.epam.weatherapp.dto.SearchCriteria;
 import com.epam.weatherapp.dto.WeatherDetailsDTO;
 import com.epam.weatherapp.exceptionhandling.DefaultExceptionHandler;
 import com.epam.weatherapp.exceptionhandling.IncorrectInputDataException;
@@ -29,28 +30,15 @@ public class WeatherController {
 	@Autowired
 	WeatherDetailsMapper weatherDetailsMapper;
 
-	@GetMapping("/weather-details/{city}")
-	public ResponseEntity<WeatherDetailsDTO> getWeatherDetailsForSelectedCity(@PathVariable String city) throws DefaultExceptionHandler {
-		ResponseEntity<WeatherDetailsDTO> response = null;
-		try {
-			Optional<WeatherDetailsDTO> weatherDetailsDTO = weatherService.getWeatherDetailsByLocationName(city);
-			response = new ResponseEntity<>(HttpStatus.NO_CONTENT);
-			if (weatherDetailsDTO.isPresent()) {
-				response = ResponseEntity.status(HttpStatus.FOUND).body(weatherDetailsDTO.get());
-			}
-		} catch (Exception e) {
-			throw new DefaultExceptionHandler(e);
-		}
-		return response;
-	}
-	@GetMapping("/weather-details/all")
-	public ResponseEntity<List<WeatherDetailsDTO>> getWeatherDetailsForAllCities() throws DefaultExceptionHandler {
+	@PostMapping("/weather-details/search")
+	public ResponseEntity<List<WeatherDetailsDTO>> getWeatherDetails(
+			@RequestBody(required = false) SearchCriteria searchCriteria) throws DefaultExceptionHandler {
 		ResponseEntity<List<WeatherDetailsDTO>> response = null;
 		try {
-			List<WeatherDetailsDTO> weatherDetailsDTO = weatherService.getAllWeatherDetails();
-			response = new ResponseEntity<>(HttpStatus.NO_CONTENT);
-			if (weatherDetailsDTO != null) {
-				response = ResponseEntity.status(HttpStatus.FOUND).body(weatherDetailsDTO);
+			List<WeatherDetailsDTO> weatherDetailsDTOList = weatherService.getAllWeatherDetails(searchCriteria);
+			response = new ResponseEntity<>(HttpStatus.NOT_FOUND);
+			if (weatherDetailsDTOList != null) {
+				response = ResponseEntity.status(HttpStatus.OK).body(weatherDetailsDTOList);
 			}
 		} catch (Exception e) {
 			throw new DefaultExceptionHandler(e);
@@ -58,22 +46,41 @@ public class WeatherController {
 		return response;
 	}
 
-	@PostMapping("/add-weather-details")
-	public ResponseEntity<WeatherDetailsDTO> addWeatherDetailsForSelectedCity(@RequestBody WeatherDetailsDTO weatherDetailsDTO) throws LocationAlreadyPresentException, IncorrectInputDataException, DefaultExceptionHandler {
+	@DeleteMapping(name = "/weather-details/{city}")
+	public ResponseEntity<String> deleteWeatherDetails(@PathVariable String city) throws DefaultExceptionHandler {
+		ResponseEntity<String> response = null;
+		try {
+			Optional<WeatherDetailsDTO> weatherDetailsDTO = weatherService.getWeatherDetailsByLocationName(city);
+			response = ResponseEntity.status(HttpStatus.NOT_FOUND).body("City not available in database to delete!!");
+			if (weatherDetailsDTO.isPresent()) {
+				boolean isSuccess = weatherService.deleteByLocationName(city);
+				response = ResponseEntity.status(HttpStatus.CONFLICT).body("Unable to delete Record!!");
+				if (isSuccess) {
+					response = ResponseEntity.status(HttpStatus.OK).body("Record Deleted Successfully!!");
+				}
+			}
+		} catch (Exception e) {
+			throw new DefaultExceptionHandler(e);
+		}
+		return response;
+	}
+
+	@PostMapping("/weather-details")
+	public ResponseEntity<WeatherDetailsDTO> addWeatherDetailsForSelectedCity(
+			@RequestBody WeatherDetailsDTO weatherDetailsDTO)
+			throws LocationAlreadyPresentException, IncorrectInputDataException, DefaultExceptionHandler {
 		ResponseEntity<WeatherDetailsDTO> response = new ResponseEntity<>(HttpStatus.NO_CONTENT);
 		try {
-			weatherDetailsDTO = weatherService.updateWeatherDetails(weatherDetailsDTO);			
+			weatherDetailsDTO = weatherService.addWeatherDetails(weatherDetailsDTO);
 			if (weatherDetailsDTO != null) {
 				response = ResponseEntity.status(HttpStatus.CREATED).body(weatherDetailsDTO);
 			}
+		} catch (DataIntegrityViolationException e) {
+			throw new LocationAlreadyPresentException(weatherDetailsDTO.getLocationName(), e);
+		} catch (ConstraintViolationException e) {
+			throw new IncorrectInputDataException(weatherDetailsDTO, e);
 		} catch (Exception e) {
-			if(e.getClass().isAssignableFrom((DataIntegrityViolationException.class))) {
-				throw new LocationAlreadyPresentException(weatherDetailsDTO.getLocationName(),e);
-			}else if(e.getClass().isAssignableFrom(ConstraintViolationException.class)) {
-				throw new IncorrectInputDataException(weatherDetailsDTO,e);	
-			}else {
-				throw new DefaultExceptionHandler(e);
-			}
+			throw new DefaultExceptionHandler(e);
 		}
 		return response;
 	}
